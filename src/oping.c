@@ -76,72 +76,6 @@
 
 #include <locale.h>
 #include <langinfo.h>
-
-#if USE_NCURSES
-# define NCURSES_OPAQUE 1
-/* http://newsgroups.derkeiler.com/Archive/Rec/rec.games.roguelike.development/2010-09/msg00050.html */
-# define _X_OPEN_SOURCE_EXTENDED
-
-#if defined HAVE_NCURSESW_CURSES_H
-#  include <ncursesw/curses.h>
-#elif defined HAVE_NCURSESW_H
-#  include <ncursesw.h>
-#elif defined HAVE_NCURSES_CURSES_H
-#  include <ncurses/curses.h>
-#elif defined HAVE_NCURSES_H
-#  include <ncurses.h>
-#else
-#  error "SysV or X/Open-compatible Curses header file required"
-#endif
-
-# define OPING_GREEN 1
-# define OPING_YELLOW 2
-# define OPING_RED 3
-# define OPING_GREEN_HIST 4
-# define OPING_YELLOW_HIST 5
-# define OPING_RED_HIST 6
-
-double const threshold_green = 0.8;
-double const threshold_yellow = 0.95;
-
-static char const * const hist_symbols_utf8[] = {
-	"▁", "▂", "▃", "▄", "▅", "▆", "▇", "█" };
-static size_t const hist_symbols_utf8_num = sizeof (hist_symbols_utf8)
-	/ sizeof (hist_symbols_utf8[0]);
-
-/* scancodes for 6 levels of horizontal bars, ncurses-specific */
-/* those are not the usual constants because those are not constant */
-static int const hist_symbols_acs[] = {
-	115, /* ACS_S9 "⎽" */
-	114, /* ACS_S7 "⎼" */
-	113, /* ACS_S5 "─" */
-	112, /* ACS_S3 "⎻" */
-	111  /* ACS_S1 "⎺" */
-};
-static size_t const hist_symbols_acs_num = sizeof (hist_symbols_acs)
-	/ sizeof (hist_symbols_acs[0]);
-
-/* use different colors without a background for scancodes */
-static int const hist_colors_utf8[] = {
-	OPING_GREEN_HIST, OPING_YELLOW_HIST, OPING_RED_HIST };
-static int const hist_colors_acs[] = {
-	OPING_GREEN, OPING_YELLOW, OPING_RED };
-/* assuming that both arrays are the same size */
-static size_t const hist_colors_num = sizeof (hist_colors_utf8)
-	/ sizeof (hist_colors_utf8[0]);
-#endif
-
-/* "─" */
-#define BOXPLOT_WHISKER_BAR       (113 | A_ALTCHARSET)
-/* "├" */
-#define BOXPLOT_WHISKER_LEFT_END  (116 | A_ALTCHARSET)
-/* "┤" */
-#define BOXPLOT_WHISKER_RIGHT_END (117 | A_ALTCHARSET)
-/* Inverted */
-#define BOXPLOT_BOX               ' '
-/* "│", inverted */
-#define BOXPLOT_MEDIAN            (120 | A_ALTCHARSET)
-
 #include "oping.h"
 
 #ifndef _POSIX_SAVED_IDS
@@ -167,6 +101,7 @@ typedef struct ping_context
 	int req_rcvd;
 
 	double latency_total;
+	double tsum2;
 
 #ifndef HISTORY_SIZE_MAX
 # define HISTORY_SIZE_MAX 900
@@ -191,10 +126,6 @@ typedef struct ping_context
 
 	/* If set to true, history_by_value has to be re-calculated. */
 	_Bool history_dirty;
-
-#if USE_NCURSES
-	WINDOW *window;
-#endif
 } ping_context_t;
 
 static double  opt_interval   = 1.0;
@@ -210,19 +141,11 @@ static uint8_t opt_send_qos   = 0;
 #define OPING_DEFAULT_PERCENTILE 95.0
 static double  opt_percentile = -1.0;
 static double  opt_exit_status_threshold = 1.0;
-#if USE_NCURSES
-static int     opt_show_graph = 1;
-static int     opt_utf8       = 0;
-#endif
 static char   *opt_outfile    = NULL;
 static int     opt_bell       = 0;
 
 static int host_num  = 0;
 static FILE *outfile = NULL;
-
-#if USE_NCURSES
-static WINDOW *main_win = NULL;
-#endif
 
 static void sigint_handler (int signal) /* {{{ */
 {
@@ -238,10 +161,6 @@ static ping_context_t *context_create () /* {{{ */
 	if (ctx == NULL)
 		return (NULL);
 
-#if USE_NCURSES
-	ctx->window = NULL;
-#endif
-
 	return (ctx);
 } /* }}} ping_context_t *context_create */
 
@@ -249,14 +168,6 @@ static void context_destroy (ping_context_t *context) /* {{{ */
 {
 	if (context == NULL)
 		return;
-
-#if USE_NCURSES
-	if (context->window != NULL)
-	{
-		delwin (context->window);
-		context->window = NULL;
-	}
-#endif
 
 	free (context);
 } /* }}} void context_destroy */
@@ -338,54 +249,6 @@ static double percentile_to_latency (ping_context_t *ctx, /* {{{ */
 	return (ctx->history_by_value[index]);
 } /* }}} double percentile_to_latency */
 
-#if USE_NCURSES
-static double latency_to_ratio (ping_context_t *ctx, /* {{{ */
-		double latency)
-{
-	size_t low;
-	size_t high;
-	size_t index;
-
-	clean_history (ctx);
-
-	/* Not a single packet was received successfully. */
-	if (ctx->history_received == 0)
-		return NAN;
-
-	low = 0;
-	high = ctx->history_received - 1;
-
-	if (latency < ctx->history_by_value[low])
-		return 0.0;
-	else if (latency >= ctx->history_by_value[high])
-		return 100.0;
-
-	/* Do a binary search for the latency. This will work even when the
-	 * exact latency is not in the array. If the latency is in the array
-	 * multiple times, "low" will be set to the index of the last
-	 * occurrence. The value at index "high" will be larger than the
-	 * searched for latency (assured by the above "if" block. */
-	while ((high - low) > 1)
-	{
-		index = (high + low) / 2;
-
-		if (ctx->history_by_value[index] > latency)
-			high = index;
-		else
-			low = index;
-	}
-
-	assert (ctx->history_by_value[high] > latency);
-	assert (ctx->history_by_value[low] <= latency);
-
-	if (ctx->history_by_value[low] == latency)
-		index = low;
-	else
-		index = high;
-
-	return (((double) (index + 1)) / ((double) ctx->history_received));
-} /* }}} double latency_to_ratio */
-#endif
 
 static double context_get_packet_loss (const ping_context_t *ctx) /* {{{ */
 {
@@ -468,10 +331,6 @@ static void usage_exit (const char *name, int status) /* {{{ */
 			"  -m mark      mark to set on outgoing packets\n"
 			"  -f filename  read hosts from <filename>\n"
 			"  -O filename  write RTT measurements to <filename>\n"
-#if USE_NCURSES
-			"  -u / -U      force / disable UTF-8 output\n"
-			"  -g graph     graph type to draw\n"
-#endif
 			"  -P percent   Report the n'th percentile of latency\n"
 			"  -Z percent   Exit with non-zero exit status if more than this percentage of\n"
 			"               probes timed out. (default: never)\n"
@@ -677,11 +536,7 @@ static int read_options (int argc, char **argv) /* {{{ */
 
 	while (1)
 	{
-		optchar = getopt (argc, argv, "46c:hi:I:t:Q:f:D:Z:O:P:m:w:b"
-#if USE_NCURSES
-				"uUg:"
-#endif
-				);
+		optchar = getopt (argc, argv, "46c:hi:I:t:Q:f:D:Z:O:P:m:w:b");
 
 		if (optchar == -1)
 			break;
@@ -794,28 +649,6 @@ static int read_options (int argc, char **argv) /* {{{ */
 						opt_percentile = new_percentile;
 				}
 				break;
-
-#if USE_NCURSES
-			case 'g':
-				if (strcasecmp ("none", optarg) == 0)
-					opt_show_graph = 0;
-				else if (strcasecmp ("prettyping", optarg) == 0)
-					opt_show_graph = 1;
-				else if (strcasecmp ("histogram", optarg) == 0)
-					opt_show_graph = 2;
-				else if (strcasecmp ("boxplot", optarg) == 0)
-					opt_show_graph = 3;
-				else
-					fprintf (stderr, "Unknown graph option: %s\n", optarg);
-				break;
-
-			case 'u':
-				opt_utf8 = 2;
-				break;
-			case 'U':
-				opt_utf8 = 1;
-				break;
-#endif
 			case 'b':
 				opt_bell = 1;
 				break;
@@ -900,580 +733,6 @@ static void time_calc (struct timespec *ts_dest, /* {{{ */
 	time_normalize (ts_dest);
 } /* }}} void time_calc */
 
-#if USE_NCURSES
-static _Bool has_utf8() /* {{{ */
-{
-# if HAVE_NCURSESW_NCURSES_H
-	if (!opt_utf8)
-	{
-		/* Automatically determine */
-		if (strcasecmp ("UTF-8", nl_langinfo (CODESET)) == 0)
-			opt_utf8 = 2;
-		else
-			opt_utf8 = 1;
-	}
-	return ((_Bool) (opt_utf8 - 1));
-# else
-	return (0);
-# endif
-} /* }}} _Bool has_utf8 */
-
-static int update_graph_boxplot (ping_context_t *ctx) /* {{{ */
-{
-	uint32_t *counters;
-	double *ratios;
-	size_t i;
-	size_t x_max;
-	size_t x;
-
-	clean_history (ctx);
-
-	if (ctx->history_received == 0)
-		return (ENOENT);
-
-	x_max = (size_t) getmaxx (ctx->window);
-	if (x_max <= 8)
-		return (EINVAL);
-	x_max -= 4;
-
-	counters = calloc (x_max, sizeof (*counters));
-	ratios = calloc (x_max, sizeof (*ratios));
-
-	/* Bucketize */
-	for (i = 0; i < ctx->history_received; i++)
-	{
-		double latency = ctx->history_by_value[i] / 1000.0;
-		size_t index = (size_t) (((double) x_max) * latency / opt_interval);
-
-		if (index >= x_max)
-			index = x_max - 1;
-
-		counters[index]++;
-	}
-
-	/* Sum and calc ratios */
-	ratios[0] = ((double) counters[0]) / ((double) ctx->history_received);
-	for (x = 1; x < x_max; x++)
-	{
-		counters[x] += counters[x - 1];
-		ratios[x] = ((double) counters[x]) / ((double) ctx->history_received);
-	}
-
-	for (x = 0; x < x_max; x++)
-	{
-		int symbol = ' ';
-		_Bool reverse = 0;
-
-		if (x == 0)
-		{
-			if (ratios[x] >= 0.5)
-			{
-				symbol = BOXPLOT_MEDIAN;
-				reverse = 1;
-			}
-			else if (ratios[x] > 0.25)
-			{
-				symbol = BOXPLOT_BOX;
-				reverse = 1;
-			}
-			else if (ratios[x] > 0.025)
-				symbol = BOXPLOT_WHISKER_BAR;
-			else
-				symbol = ' '; /* NOP */
-		}
-		else /* (x != 0) */
-		{
-			if ((ratios[x - 1] < 0.5) && (ratios[x] >= 0.5))
-			{
-				symbol = BOXPLOT_MEDIAN;
-				reverse = 1;
-			}
-			else if (((ratios[x] >= 0.25) && (ratios[x] <= 0.75))
-					|| ((ratios[x - 1] < 0.75) && (ratios[x] > 0.75)))
-			{
-				symbol = BOXPLOT_BOX;
-				reverse = 1;
-			}
-			else if ((ratios[x] < 0.5) && (ratios[x] >= 0.025))
-			{
-				if (ratios[x - 1] < 0.025)
-					symbol = BOXPLOT_WHISKER_LEFT_END;
-				else
-					symbol = BOXPLOT_WHISKER_BAR;
-			}
-			else if ((ratios[x] > .5) && (ratios[x] < 0.975))
-			{
-				symbol = BOXPLOT_WHISKER_BAR;
-			}
-			else if ((ratios[x] >= 0.975) && (ratios[x - 1] < 0.975))
-				symbol = BOXPLOT_WHISKER_RIGHT_END;
-		}
-
-		if (reverse)
-			wattron (ctx->window, A_REVERSE);
-		mvwaddch (ctx->window, /* y = */ 3, /* x = */ (int) (x + 2), symbol);
-		// mvwprintw (ctx->window, /* y = */ 3, /* x = */ (int) (x + 2), symbol);
-		if (reverse)
-			wattroff (ctx->window, A_REVERSE);
-	}
-
-	free (counters);
-	free (ratios);
-	return (0);
-} /* }}} int update_graph_boxplot */
-
-static int update_graph_prettyping (ping_context_t *ctx, /* {{{ */
-		double latency)
-{
-	size_t x;
-	size_t x_max;
-	size_t history_offset;
-
-	x_max = (size_t) getmaxx (ctx->window);
-	if (x_max <= 4)
-		return (EINVAL);
-	x_max -= 4;
-
-	/* Determine the first index in the history we need to draw
-	 * the graph. */
-	history_offset = 0;
-	if (((size_t) x_max) < ctx->history_size) /* window is smaller than history */
-	{
-		if (ctx->history_index > x_max)
-			history_offset = ctx->history_index - x_max;
-		else /* wrap around */
-			history_offset = ctx->history_index + ctx->history_size - x_max;
-	}
-	else /* window is larger than history */
-	{
-		if (ctx->history_index != ctx->history_size) /* no longer growing. */
-			history_offset = ctx->history_index;
-		else /* start-up */
-			history_offset = 0;
-	}
-
-	for (x = 0; x < x_max; x++)
-	{
-		size_t index;
-		double latency;
-
-		int color = OPING_RED;
-		char const *symbol = "!";
-		int symbolc = '!';
-
-		if (x >= ctx->history_size)
-		{
-			mvwaddch (ctx->window, /* y = */ 3, /* x = */ x + 2, ' ');
-			continue;
-		}
-
-		index = (history_offset + x) % ctx->history_size;
-		latency = ctx->history_by_time[index];
-
-		if (latency < 0) {
-			continue;
-		}
-
-		if (latency >= 0.0)
-		{
-			double ratio;
-
-			size_t symbols_num = hist_symbols_acs_num;
-			size_t colors_num = 1;
-
-			size_t index_symbols;
-			size_t index_colors;
-			size_t intensity;
-
-			/* latency is in milliseconds, opt_interval is in seconds. */
-			ratio = (latency * 0.001) / opt_interval;
-			if (ratio > 1) {
-				ratio = 1.0;
-			}
-
-			if (has_utf8 ())
-				symbols_num = hist_symbols_utf8_num;
-
-			if (has_colors () == TRUE)
-				colors_num = hist_colors_num;
-
-			intensity = (size_t) (ratio * ((double) (symbols_num * colors_num)));
-			if (intensity >= (symbols_num * colors_num))
-				intensity = (symbols_num * colors_num) - 1;
-
-			index_symbols = intensity % symbols_num;
-			assert (index_symbols < symbols_num);
-
-			index_colors = intensity / symbols_num;
-			assert (index_colors < colors_num);
-
-			if (has_utf8())
-			{
-				color = hist_colors_utf8[index_colors];
-				symbol = hist_symbols_utf8[index_symbols];
-			}
-			else
-			{
-				color = hist_colors_acs[index_colors];
-				symbolc = hist_symbols_acs[index_symbols] | A_ALTCHARSET;
-			}
-		}
-		else /* if (!(latency >= 0.0)) */
-			wattron (ctx->window, A_BOLD);
-
-		if (has_colors () == TRUE)
-			wattron (ctx->window, COLOR_PAIR(color));
-
-		if (has_utf8())
-			mvwprintw (ctx->window, /* y = */ 3, /* x = */ x + 2, symbol);
-		else
-			mvwaddch (ctx->window, /* y = */ 3, /* x = */ x + 2, symbolc);
-
-		if (has_colors () == TRUE)
-			wattroff (ctx->window, COLOR_PAIR(color));
-
-		/* Use negation here to handle NaN correctly. */
-		if (!(latency >= 0.0))
-			wattroff (ctx->window, A_BOLD);
-	} /* for (x) */
-
-	return (0);
-} /* }}} int update_graph_prettyping */
-
-static int update_graph_histogram (ping_context_t *ctx) /* {{{ */
-{
-	uint32_t *counters;
-	uint32_t *accumulated;
-	uint32_t max;
-	size_t i;
-	size_t x_max;
-	size_t x;
-
-	size_t symbols_num = hist_symbols_acs_num;
-
-	clean_history (ctx);
-
-	if (ctx->history_received == 0)
-		return (ENOENT);
-
-	if (has_utf8 ())
-		symbols_num = hist_symbols_utf8_num;
-
-	x_max = (size_t) getmaxx (ctx->window);
-	if (x_max <= 4)
-		return (EINVAL);
-	x_max -= 4;
-
-	counters = calloc (x_max, sizeof (*counters));
-	accumulated = calloc (x_max, sizeof (*accumulated));
-
-	/* Bucketize */
-	max = 0;
-	for (i = 0; i < ctx->history_received; i++)
-	{
-		double latency = ctx->history_by_value[i] / 1000.0;
-		size_t index = (size_t) (((double) x_max) * latency / opt_interval);
-
-		if (index >= x_max)
-			index = x_max - 1;
-
-		counters[index]++;
-		if (max < counters[index])
-			max = counters[index];
-	}
-
-	/* Sum */
-	accumulated[0] = counters[0];
-	for (x = 1; x < x_max; x++)
-		accumulated[x] = counters[x] + accumulated[x - 1];
-
-	/* Calculate ratios */
-	for (x = 0; x < x_max; x++)
-	{
-		double height = ((double) counters[x]) / ((double) max);
-		double ratio_this = ((double) accumulated[x]) / ((double) ctx->history_received);
-		double ratio_prev = 0.0;
-		size_t index;
-		int color = 0;
-
-		index = (size_t) (height * ((double) symbols_num));
-		if (index >= symbols_num)
-			index = symbols_num - 1;
-
-		if (x > 0)
-			ratio_prev = ((double) accumulated[x - 1]) / ((double) ctx->history_received);
-
-		if (has_colors () == TRUE)
-		{
-			if ((ratio_this <= threshold_green)
-					|| ((ratio_prev < threshold_green)
-						&& (ratio_this > threshold_green)))
-				color = OPING_GREEN;
-			else if ((ratio_this <= threshold_yellow)
-					|| ((ratio_prev < threshold_yellow)
-						&& (ratio_this > threshold_yellow)))
-				color = OPING_YELLOW;
-			else
-				color = OPING_RED;
-
-			wattron (ctx->window, COLOR_PAIR(color));
-		}
-
-		if (counters[x] == 0)
-			mvwaddch (ctx->window, /* y = */ 3, /* x = */ x + 2, ' ');
-		else if (has_utf8 ())
-			mvwprintw (ctx->window, /* y = */ 3, /* x = */ x + 2,
-					hist_symbols_utf8[index]);
-		else
-			mvwaddch (ctx->window, /* y = */ 3, /* x = */ x + 2,
-					hist_symbols_acs[index] | A_ALTCHARSET);
-
-		if (has_colors () == TRUE)
-			wattroff (ctx->window, COLOR_PAIR(color));
-
-	}
-
-	free (accumulated);
-	return (0);
-} /* }}} int update_graph_histogram */
-
-static int update_stats_from_context (ping_context_t *ctx, pingobj_iter_t *iter) /* {{{ */
-{
-	double latency = -1.0;
-	size_t buffer_len = sizeof (latency);
-
-	ping_iterator_get_info (iter, PING_INFO_LATENCY,
-			&latency, &buffer_len);
-
-	if ((ctx == NULL) || (ctx->window == NULL))
-		return (EINVAL);
-
-	/* werase (ctx->window); */
-
-	box (ctx->window, 0, 0);
-	wattron (ctx->window, A_BOLD);
-	mvwprintw (ctx->window, /* y = */ 0, /* x = */ 5,
-			" %s ", ctx->host);
-	wattroff (ctx->window, A_BOLD);
-	wprintw (ctx->window, "ping statistics ");
-	mvwprintw (ctx->window, /* y = */ 1, /* x = */ 2,
-			"%i packets transmitted, %i received, %.2f%% packet "
-			"loss, time %.1fms",
-			ctx->req_sent, ctx->req_rcvd,
-			context_get_packet_loss (ctx),
-			ctx->latency_total);
-	if (ctx->req_rcvd != 0)
-	{
-		double min;
-		double median;
-		double max;
-		double percentile;
-
-		min = percentile_to_latency (ctx, 0.0);
-		median = percentile_to_latency (ctx, 50.0);
-		max = percentile_to_latency (ctx, 100.0);
-		percentile = percentile_to_latency (ctx, opt_percentile);
-
-		mvwprintw (ctx->window, /* y = */ 2, /* x = */ 2,
-				"RTT[ms]: min = %.0f, median = %.0f, p(%.0f) = %.0f, max = %.0f  ",
-				min, median, opt_percentile, percentile, max);
-	}
-
-	if (opt_show_graph == 1)
-		update_graph_prettyping (ctx, latency);
-	else if (opt_show_graph == 2)
-		update_graph_histogram (ctx);
-	else if (opt_show_graph == 3)
-		update_graph_boxplot (ctx);
-
-	wrefresh (ctx->window);
-
-	return (0);
-} /* }}} int update_stats_from_context */
-
-static int on_resize (pingobj_t *ping) /* {{{ */
-{
-	pingobj_iter_t *iter;
-	int width = 0;
-	int height = 0;
-	int main_win_height;
-	int box_height = (opt_show_graph == 0) ? 4 : 5;
-
-	getmaxyx (stdscr, height, width);
-	if ((height < 1) || (width < 1))
-		return (EINVAL);
-
-	main_win_height = height - (box_height * host_num);
-	wresize (main_win, main_win_height, /* width = */ width);
-	/* Allow scrolling */
-	scrollok (main_win, TRUE);
-	/* wsetscrreg (main_win, 0, main_win_height - 1); */
-	/* Allow hardware accelerated scrolling. */
-	idlok (main_win, TRUE);
-	wrefresh (main_win);
-
-	for (iter = ping_iterator_get (ping);
-			iter != NULL;
-			iter = ping_iterator_next (iter))
-	{
-		ping_context_t *context;
-
-		context = ping_iterator_get_context (iter);
-		if (context == NULL)
-			continue;
-
-		if (context->window != NULL)
-		{
-			werase (context->window);
-			wrefresh (context->window);
-			delwin (context->window);
-			context->window = NULL;
-		}
-		context->window = newwin (/* height = */ box_height,
-				/* width = */ width,
-				/* y = */ main_win_height + (box_height * context->index),
-				/* x = */ 0);
-	}
-
-	return (0);
-} /* }}} */
-
-static int check_resize (pingobj_t *ping) /* {{{ */
-{
-	int need_resize = 0;
-
-	while (42)
-	{
-		int key = wgetch (stdscr);
-		if (key == ERR)
-			break;
-		else if (key == KEY_RESIZE)
-			need_resize = 1;
-		else if (key == 'g')
-		{
-			if (opt_show_graph == 3)
-				opt_show_graph = 1;
-			else if (opt_show_graph > 0)
-				opt_show_graph++;
-		}
-		else if (key == 'a')
-		{
-			char host[NI_MAXHOST];
-
-			wprintw (main_win, "New Host: ");
-			echo ();
-			wgetnstr (main_win, host, sizeof (host));
-			noecho ();
-
-			if (ping_host_add(ping, host) < 0)
-			{
-				const char *errmsg = ping_get_error (ping);
-
-				wprintw (main_win, "Adding host `%s' failed: %s\n", host, errmsg);
-			}
-			else
-			{
-				/* FIXME - scroll main_win correctly so that old
-				 * data is still visible */
-				need_resize = 1;
-				host_num = ping_iterator_count(ping);
-				ping_initialize_contexts(ping);
-			}
-		}
-	}
-
-	if (need_resize)
-		return (on_resize (ping));
-	else
-		return (0);
-} /* }}} int check_resize */
-
-static int pre_loop_hook (pingobj_t *ping) /* {{{ */
-{
-	pingobj_iter_t *iter;
-	int width = 0;
-	int height = 0;
-	int main_win_height;
-	int box_height = (opt_show_graph == 0) ? 4 : 5;
-
-	initscr ();
-	cbreak ();
-	noecho ();
-	nodelay (stdscr, TRUE);
-
-	getmaxyx (stdscr, height, width);
-	if ((height < 1) || (width < 1))
-		return (EINVAL);
-
-	if (has_colors () == TRUE)
-	{
-		start_color ();
-		use_default_colors ();
-		init_pair (OPING_GREEN,  COLOR_GREEN,  /* default = */ -1);
-		init_pair (OPING_YELLOW, COLOR_YELLOW, /* default = */ -1);
-		init_pair (OPING_RED,    COLOR_RED,    /* default = */ -1);
-		init_pair (OPING_GREEN_HIST,  COLOR_GREEN,  -1);
-		init_pair (OPING_YELLOW_HIST, COLOR_YELLOW, COLOR_GREEN);
-		init_pair (OPING_RED_HIST,    COLOR_RED,    COLOR_YELLOW);
-	}
-
-	main_win_height = height - (box_height * host_num);
-	main_win = newwin (/* height = */ main_win_height,
-			/* width = */ width,
-			/* y = */ 0, /* x = */ 0);
-	/* Allow scrolling */
-	scrollok (main_win, TRUE);
-	/* wsetscrreg (main_win, 0, main_win_height - 1); */
-	/* Allow hardware accelerated scrolling. */
-	idlok (main_win, TRUE);
-	wmove (main_win, /* y = */ main_win_height - 1, /* x = */ 0);
-	wrefresh (main_win);
-
-	for (iter = ping_iterator_get (ping);
-			iter != NULL;
-			iter = ping_iterator_next (iter))
-	{
-		ping_context_t *context;
-
-		context = ping_iterator_get_context (iter);
-		if (context == NULL)
-			continue;
-
-		if (context->window != NULL)
-		{
-			delwin (context->window);
-			context->window = NULL;
-		}
-		context->window = newwin (/* height = */ box_height,
-				/* width = */ width,
-				/* y = */ main_win_height + (box_height * context->index),
-				/* x = */ 0);
-	}
-
-
-	/* Don't know what good this does exactly, but without this code
-	 * "check_resize" will be called right after startup and *somehow*
-	 * this leads to display errors. If we purge all initial characters
-	 * here, the problem goes away. "wgetch" is non-blocking due to
-	 * "nodelay" (see above). */
-	while (wgetch (stdscr) != ERR)
-	{
-		/* eat up characters */;
-	}
-
-	return (0);
-} /* }}} int pre_loop_hook */
-
-static int pre_sleep_hook (pingobj_t *ping) /* {{{ */
-{
-	return (check_resize (ping));
-} /* }}} int pre_sleep_hook */
-
-static int post_sleep_hook (pingobj_t *ping) /* {{{ */
-{
-	return (check_resize (ping));
-} /* }}} int pre_sleep_hook */
-#else /* if !USE_NCURSES */
 static int pre_loop_hook (pingobj_t *ping) /* {{{ */
 {
 	pingobj_iter_t *iter;
@@ -1510,7 +769,6 @@ static int post_sleep_hook (__attribute__((unused)) pingobj_t *ping) /* {{{ */
 {
 	return (0);
 } /* }}} int post_sleep_hook */
-#endif
 
 static void update_context (ping_context_t *ctx, double latency) /* {{{ */
 {
@@ -1520,6 +778,7 @@ static void update_context (ping_context_t *ctx, double latency) /* {{{ */
 	{
 		ctx->req_rcvd++;
 		ctx->latency_total += latency;
+		ctx->tsum2 += latency * latency;
 	}
 	else
 	{
@@ -1574,48 +833,12 @@ static void update_host_hook (pingobj_iter_t *iter, /* {{{ */
 
 	context = (ping_context_t *) ping_iterator_get_context (iter);
 
-#if USE_NCURSES
-# define HOST_PRINTF(...) wprintw(main_win, __VA_ARGS__)
-#else
 # define HOST_PRINTF(...) printf(__VA_ARGS__)
-#endif
 
 	update_context (context, latency);
 
 	if (latency > 0.0)
 	{
-#if USE_NCURSES
-		if (has_colors () == TRUE)
-		{
-			double ratio;
-			int color = OPING_GREEN;
-
-			ratio = latency_to_ratio (context, latency);
-			if (ratio < threshold_green)
-				color = OPING_GREEN;
-			else if (ratio < threshold_yellow)
-				color = OPING_YELLOW;
-			else
-				color = OPING_RED;
-
-			HOST_PRINTF ("%zu bytes from %s (%s): icmp_seq=%u ttl=%i ",
-					data_len, context->host, context->addr,
-					sequence, recv_ttl,
-					format_qos (recv_qos, recv_qos_str, sizeof (recv_qos_str)));
-			if ((recv_qos != 0) || (opt_send_qos != 0))
-			{
-				HOST_PRINTF ("qos=%s ",
-						format_qos (recv_qos, recv_qos_str, sizeof (recv_qos_str)));
-			}
-			HOST_PRINTF ("time=");
-			wattron (main_win, COLOR_PAIR(color));
-			HOST_PRINTF ("%.2f", latency);
-			wattroff (main_win, COLOR_PAIR(color));
-			HOST_PRINTF (" ms\n");
-		}
-		else
-		{
-#endif
 		HOST_PRINTF ("%zu bytes from %s (%s): icmp_seq=%u ttl=%i ",
 				data_len,
 				context->host, context->addr,
@@ -1626,39 +849,16 @@ static void update_host_hook (pingobj_iter_t *iter, /* {{{ */
 					format_qos (recv_qos, recv_qos_str, sizeof (recv_qos_str)));
 		}
 		HOST_PRINTF ("time=%.2f ms\n", latency);
-#if USE_NCURSES
-		}
-#endif
-                if (opt_bell) {
-#if USE_NCURSES
-			beep();
-#else
+
+		if (opt_bell) {
 			HOST_PRINTF ("\a");
-#endif
-                }
+		}
 	}
 	else /* if (!(latency > 0.0)) */
 	{
-#if USE_NCURSES
-		if (has_colors () == TRUE)
-		{
-			HOST_PRINTF ("echo reply from %s (%s): icmp_seq=%u ",
-					context->host, context->addr,
-					sequence);
-			wattron (main_win, COLOR_PAIR(OPING_RED) | A_BOLD);
-			HOST_PRINTF ("timeout");
-			wattroff (main_win, COLOR_PAIR(OPING_RED) | A_BOLD);
-			HOST_PRINTF ("\n");
-		}
-		else
-		{
-#endif
 		HOST_PRINTF ("echo reply from %s (%s): icmp_seq=%u timeout\n",
 				context->host, context->addr,
 				sequence);
-#if USE_NCURSES
-		}
-#endif
 	}
 
 	if (outfile != NULL)
@@ -1675,10 +875,6 @@ static void update_host_hook (pingobj_iter_t *iter, /* {{{ */
 		}
 	}
 
-#if USE_NCURSES
-	update_stats_from_context (context, iter);
-	wrefresh (main_win);
-#endif
 } /* }}} void update_host_hook */
 
 /* Prints statistics for each host, cleans up the contexts and returns the
@@ -1688,10 +884,6 @@ static int post_loop_hook (pingobj_t *ping) /* {{{ */
 {
 	pingobj_iter_t *iter;
 	int failure_count = 0;
-
-#if USE_NCURSES
-	endwin ();
-#endif
 
 	for (iter = ping_iterator_get (ping);
 			iter != NULL;
@@ -1720,14 +912,18 @@ static int post_loop_hook (pingobj_t *ping) /* {{{ */
 			double median;
 			double max;
 			double percentile;
+			double mdev;
 
 			min = percentile_to_latency (context, 0.0);
 			median = percentile_to_latency (context, 50.0);
 			max = percentile_to_latency (context, 100.0);
 			percentile = percentile_to_latency (context, opt_percentile);
+			mdev = sqrt(context->tsum2 / context->req_rcvd - 
+				(context->latency_total / context->req_rcvd) *
+				(context->latency_total / context->req_rcvd));
 
-			printf ("RTT[ms]: min = %.0f, median = %.0f, p(%.0f) = %.0f, max = %.0f\n",
-					min, median, opt_percentile, percentile, max);
+			printf ("RTT[ms]: min = %.0f, median = %.0f, p(%.0f) = %.0f, max = %.0f mdev = %.0f\n",
+					min, median, opt_percentile, percentile, max, mdev);
 		}
 
 		ping_iterator_set_context (iter, NULL);
