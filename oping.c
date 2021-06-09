@@ -145,32 +145,32 @@ static int     opt_bell       = 0;
 static int host_num  = 0;
 static FILE *outfile = NULL;
 
-static void sigint_handler (int signal) /* {{{ */
+static void sigint_handler (int signal)
 {
 	/* Make compiler happy */
 	signal = 0;
 	/* Exit the loop */
 	opt_count = 0;
-} /* }}} void sigint_handler */
+}
 
-static ping_context_t *context_create () /* {{{ */
+static ping_context_t *context_create ()
 {
 	ping_context_t *ctx = calloc (1, sizeof (*ctx));
 	if (ctx == NULL)
 		return (NULL);
 
 	return (ctx);
-} /* }}} ping_context_t *context_create */
+}
 
-static void context_destroy (ping_context_t *context) /* {{{ */
+static void context_destroy (ping_context_t *context)
 {
 	if (context == NULL)
 		return;
 
 	free (context);
-} /* }}} void context_destroy */
+}
 
-static int compare_double (void const *arg0, void const *arg1) /* {{{ */
+static int compare_double (void const *arg0, void const *arg1)
 {
 	double dbl0 = *((double *) arg0);
 	double dbl1 = *((double *) arg1);
@@ -190,9 +190,9 @@ static int compare_double (void const *arg0, void const *arg1) /* {{{ */
 		return 1;
 	else
 		return 0;
-} /* }}} int compare_double */
+}
 
-static void clean_history (ping_context_t *ctx) /* {{{ */
+static void clean_history (ping_context_t *ctx)
 {
 	size_t i;
 
@@ -220,9 +220,9 @@ static void clean_history (ping_context_t *ctx) /* {{{ */
 
 	/* Mark as clean. */
 	ctx->history_dirty = 0;
-} /* }}} void clean_history */
+}
 
-static double percentile_to_latency (ping_context_t *ctx, /* {{{ */
+static double percentile_to_latency (ping_context_t *ctx,
 		double percentile)
 {
 	size_t index;
@@ -245,10 +245,9 @@ static double percentile_to_latency (ping_context_t *ctx, /* {{{ */
 	}
 
 	return (ctx->history_by_value[index]);
-} /* }}} double percentile_to_latency */
+}
 
-
-static double context_get_packet_loss (const ping_context_t *ctx) /* {{{ */
+static double context_get_packet_loss (const ping_context_t *ctx)
 {
 	if (ctx == NULL)
 		return (-1.0);
@@ -258,9 +257,9 @@ static double context_get_packet_loss (const ping_context_t *ctx) /* {{{ */
 
 	return (100.0 * (ctx->req_sent - ctx->req_rcvd)
 			/ ((double) ctx->req_sent));
-} /* }}} double context_get_packet_loss */
+}
 
-static int ping_initialize_contexts (pingobj_t *ping) /* {{{ */
+static int ping_initialize_contexts (pingobj_t *ping)
 {
 	pingobj_iter_t *iter;
 	int index;
@@ -309,9 +308,9 @@ static int ping_initialize_contexts (pingobj_t *ping) /* {{{ */
 	}
 
 	return (0);
-} /* }}} int ping_initialize_contexts */
+}
 
-static void usage_exit (const char *name, int status) /* {{{ */
+static void usage_exit (const char *name, int status)
 {
 	fprintf (stderr, "Usage: %s [OPTIONS] "
 				"-f filename | host [host [host ...]]\n"
@@ -338,10 +337,10 @@ static void usage_exit (const char *name, int status) /* {{{ */
 			"for contributions see `AUTHORS'\n",
 			name);
 	exit (status);
-} /* }}} void usage_exit */
+}
 
 __attribute__((noreturn))
-static void usage_qos_exit (const char *arg, int status) /* {{{ */
+static void usage_qos_exit (const char *arg, int status)
 {
 	if (arg != 0)
 		fprintf (stderr, "Invalid QoS argument: \"%s\"\n\n", arg);
@@ -378,9 +377,9 @@ static void usage_qos_exit (const char *arg, int status) /* {{{ */
 			(unsigned int) IPTOS_MINCOST);
 
 	exit (status);
-} /* }}} void usage_qos_exit */
+}
 
-static int set_opt_send_qos (const char *opt) /* {{{ */
+static int set_opt_send_qos (const char *opt)
 {
 	if (opt == NULL)
 		return (EINVAL);
@@ -472,9 +471,9 @@ static int set_opt_send_qos (const char *opt) /* {{{ */
 	}
 
 	return (0);
-} /* }}} int set_opt_send_qos */
+}
 
-static char *format_qos (uint8_t qos, char *buffer, size_t buffer_size) /* {{{ */
+static char *format_qos (uint8_t qos, char *buffer, size_t buffer_size)
 {
 	uint8_t dscp;
 	uint8_t ecn;
@@ -526,9 +525,9 @@ static char *format_qos (uint8_t qos, char *buffer, size_t buffer_size) /* {{{ *
 	buffer[buffer_size - 1] = 0;
 
 	return (buffer);
-} /* }}} char *format_qos */
+}
 
-static int read_options (int argc, char **argv) /* {{{ */
+static int read_options (int argc, char **argv)
 {
 	int optchar;
 
@@ -682,9 +681,9 @@ static int read_options (int argc, char **argv) /* {{{ */
 		opt_percentile = OPING_DEFAULT_PERCENTILE;
 
 	return (optind);
-} /* }}} read_options */
+}
 
-static void time_normalize (struct timespec *ts) /* {{{ */
+static void time_normalize (struct timespec *ts)
 {
 	while (ts->tv_nsec < 0)
 	{
@@ -703,9 +702,9 @@ static void time_normalize (struct timespec *ts) /* {{{ */
 		ts->tv_sec  += 1;
 		ts->tv_nsec -= 1000000000;
 	}
-} /* }}} void time_normalize */
+}
 
-static void time_calc (struct timespec *ts_dest, /* {{{ */
+static void time_calc (struct timespec *ts_dest,
 		const struct timespec *ts_int,
 		const struct timeval  *tv_begin,
 		const struct timeval  *tv_end)
@@ -729,7 +728,7 @@ static void time_calc (struct timespec *ts_dest, /* {{{ */
 	ts_dest->tv_sec = ts_dest->tv_sec - tv_end->tv_sec;
 	ts_dest->tv_nsec = ts_dest->tv_nsec - (tv_end->tv_usec * 1000);
 	time_normalize (ts_dest);
-} /* }}} void time_calc */
+}
 
 static int pre_loop_hook (pingobj_t *ping) /* {{{ */
 {
@@ -754,19 +753,19 @@ static int pre_loop_hook (pingobj_t *ping) /* {{{ */
 	}
 
 	return (0);
-} /* }}} int pre_loop_hook */
+}
 
 static int pre_sleep_hook (__attribute__((unused)) pingobj_t *ping) /* {{{ */
 {
 	fflush (stdout);
 
 	return (0);
-} /* }}} int pre_sleep_hook */
+}
 
 static int post_sleep_hook (__attribute__((unused)) pingobj_t *ping) /* {{{ */
 {
 	return (0);
-} /* }}} int post_sleep_hook */
+}
 
 static void update_context (ping_context_t *ctx, double latency) /* {{{ */
 {
@@ -791,7 +790,7 @@ static void update_context (ping_context_t *ctx, double latency) /* {{{ */
 	ctx->history_index = (ctx->history_index + 1) % HISTORY_SIZE_MAX;
 	if (ctx->history_size < HISTORY_SIZE_MAX)
 		ctx->history_size++;
-} /* }}} void update_context */
+}
 
 static void update_host_hook (pingobj_iter_t *iter, /* {{{ */
 		__attribute__((unused)) int index)
@@ -873,12 +872,12 @@ static void update_host_hook (pingobj_iter_t *iter, /* {{{ */
 		}
 	}
 
-} /* }}} void update_host_hook */
+}
 
 /* Prints statistics for each host, cleans up the contexts and returns the
  * number of hosts which failed to return more than the fraction
  * opt_exit_status_threshold of pings. */
-static int post_loop_hook (pingobj_t *ping) /* {{{ */
+static int post_loop_hook (pingobj_t *ping)
 {
 	pingobj_iter_t *iter;
 	int failure_count = 0;
@@ -929,9 +928,9 @@ static int post_loop_hook (pingobj_t *ping) /* {{{ */
 	}
 
 	return (failure_count);
-} /* }}} int post_loop_hook */
+}
 
-int main (int argc, char **argv) /* {{{ */
+int main (int argc, char **argv)
 {
 	pingobj_t      *ping;
 	pingobj_iter_t *iter;
@@ -946,26 +945,10 @@ int main (int argc, char **argv) /* {{{ */
 	int optind;
 	int i;
 	int status;
-#if _POSIX_SAVED_IDS
-	uid_t saved_set_uid;
-
-	/* Save the old effective user id */
-	saved_set_uid = geteuid ();
-	/* Set the effective user ID to the real user ID without changing the
-	 * saved set-user ID */
-	status = seteuid (getuid ());
-	if (status != 0)
-	{
-		fprintf (stderr, "Temporarily dropping privileges "
-				"failed: %s\n", strerror (errno));
-		exit (EXIT_FAILURE);
-	}
-#endif
 
 	setlocale(LC_ALL, "");
 	optind = read_options (argc, argv);
 
-#if !_POSIX_SAVED_IDS
 	/* Cannot temporarily drop privileges -> reject every file but "-". */
 	if ((opt_filename != NULL)
 			&& (strcmp ("-", opt_filename) != 0)
@@ -978,7 +961,6 @@ int main (int argc, char **argv) /* {{{ */
 				"Sorry.\n");
 		exit (EXIT_FAILURE);
 	}
-#endif
 
 	if ((optind >= argc) && (opt_filename == NULL)) {
 		usage_exit (argv[0], 1);
@@ -1079,17 +1061,6 @@ int main (int argc, char **argv) /* {{{ */
 			return (1);
 		}
 
-#if _POSIX_SAVED_IDS
-		/* Regain privileges */
-		status = seteuid (saved_set_uid);
-		if (status != 0)
-		{
-			fprintf (stderr, "Temporarily re-gaining privileges "
-					"failed: %s\n", strerror (errno));
-			exit (EXIT_FAILURE);
-		}
-#endif
-
 		while (fgets(line, sizeof(line), infile))
 		{
 			/* Strip whitespace */
@@ -1112,30 +1083,8 @@ int main (int argc, char **argv) /* {{{ */
 			}
 		}
 
-#if _POSIX_SAVED_IDS
-		/* Drop privileges */
-		status = seteuid (getuid ());
-		if (status != 0)
-		{
-			fprintf (stderr, "Temporarily dropping privileges "
-					"failed: %s\n", strerror (errno));
-			exit (EXIT_FAILURE);
-		}
-#endif
-
 		fclose(infile);
 	}
-
-#if _POSIX_SAVED_IDS
-	/* Regain privileges */
-	status = seteuid (saved_set_uid);
-	if (status != 0)
-	{
-		fprintf (stderr, "Temporarily re-gaining privileges "
-				"failed: %s\n", strerror (errno));
-		exit (EXIT_FAILURE);
-	}
-#endif
 
 	for (i = optind; i < argc; i++)
 	{
@@ -1163,10 +1112,6 @@ int main (int argc, char **argv) /* {{{ */
 
 	if (host_num == 0)
 		exit (EXIT_FAILURE);
-
-#if _POSIX_SAVED_IDS
-	saved_set_uid = (uid_t) -1;
-#endif
 
 	if (opt_outfile != NULL)
 	{
@@ -1279,6 +1224,5 @@ int main (int argc, char **argv) /* {{{ */
 			status = 255;
 		exit (status);
 	}
-} /* }}} int main */
+}
 
-/* vim: set fdm=marker : */
