@@ -21,9 +21,7 @@
 #define __APPLE_USE_RFC_3542
 #endif
 
-#if HAVE_CONFIG_H
-# include <config.h>
-#endif
+# include "config.h"
 
 #if STDC_HEADERS
 # include <stdlib.h>
@@ -115,6 +113,9 @@ struct pinghost
 	struct sockaddr_storage *addr;
 	socklen_t                addrlen;
 	int                      addrfamily;
+	struct sockaddr          srcaddr;
+	socklen_t                srcaddrlen;
+	char                     device[IFNAMSIZ];
 	int                      ident;
 	int                      sequence;
 	struct timeval          *timer;
@@ -1569,7 +1570,8 @@ static pinghost_t *ping_host_search (pinghost_t *ph, const char *host)
 	return (ph);
 }
 
-int ping_host_add (pingobj_t *obj, const char *host)
+int ping_host_add (pingobj_t *obj, const char *host, struct sockaddr *srcaddr, socklen_t srcaddrlen,
+		char *device)
 {
 	pinghost_t *ph;
 
@@ -1657,6 +1659,7 @@ int ping_host_add (pingobj_t *obj, const char *host)
 		{
 			ai_ptr->ai_socktype = SOCK_RAW;
 			ai_ptr->ai_protocol = IPPROTO_ICMPV6;
+			continue;
 		}
 		else
 		{
@@ -1700,6 +1703,15 @@ int ping_host_add (pingobj_t *obj, const char *host)
 	} /* for (ai_ptr = ai_list; ai_ptr != NULL; ai_ptr = ai_ptr->ai_next) */
 
 	freeaddrinfo (ai_list);
+
+	if (srcaddr && srcaddrlen > 0 && srcaddrlen <= sizeof(srcaddr))
+	{
+		memcpy(&ph->srcaddr, srcaddr, srcaddrlen);
+	}
+	if (device && strlen(device) > 0 && strlen(device) <= IFNAMSIZ)
+	{
+		memcpy(ph->device, device, strlen(device));
+	}
 
 	/*
 	 * Adding in the front is much easier, but then the iterator will

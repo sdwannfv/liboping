@@ -28,6 +28,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <linux/if.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -70,7 +71,8 @@ int ping_setopt (pingobj_t *obj, int option, void *value);
 
 int ping_send (pingobj_t *obj);
 
-int ping_host_add (pingobj_t *obj, const char *host);
+int ping_host_add (pingobj_t *obj, const char *host, struct sockaddr *srcaddr,
+		socklen_t srcaddrlen, char *device);
 int ping_host_remove (pingobj_t *obj, const char *host);
 
 pingobj_iter_t *ping_iterator_get (pingobj_t *obj);

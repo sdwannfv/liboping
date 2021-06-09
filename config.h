@@ -1,209 +1,210 @@
+/* src/config.h.  Generated from config.h.in by configure.  */
 /* src/config.h.in.  Generated from configure.ac by autoheader.  */
 
 /* Define to 1 if you have the declaration of `strerror_r', and to 0 if you
    don't. */
-#undef HAVE_DECL_STRERROR_R
+#define HAVE_DECL_STRERROR_R 1
 
 /* Define to 1 if you have the <dlfcn.h> header file. */
-#undef HAVE_DLFCN_H
+#define HAVE_DLFCN_H 1
 
 /* Define to 1 if you have the <fcntl.h> header file. */
-#undef HAVE_FCNTL_H
+#define HAVE_FCNTL_H 1
 
 /* Define to 1 if you have the `gettimeofday' function. */
-#undef HAVE_GETTIMEOFDAY
+#define HAVE_GETTIMEOFDAY 1
 
 /* Define to 1 if you have the <inttypes.h> header file. */
-#undef HAVE_INTTYPES_H
+#define HAVE_INTTYPES_H 1
 
 /* Define to 1 if you have the <langinfo.h> header file. */
-#undef HAVE_LANGINFO_H
+#define HAVE_LANGINFO_H 1
 
 /* Define to 1 if you have the <locale.h> header file. */
-#undef HAVE_LOCALE_H
+#define HAVE_LOCALE_H 1
 
 /* Define to 1 if your system has a GNU libc compatible `malloc' function, and
    to 0 otherwise. */
-#undef HAVE_MALLOC
+#define HAVE_MALLOC 1
 
 /* Define to 1 if you have the <math.h> header file. */
-#undef HAVE_MATH_H
+#define HAVE_MATH_H 1
 
 /* Define to 1 if you have the <memory.h> header file. */
-#undef HAVE_MEMORY_H
+#define HAVE_MEMORY_H 1
 
 /* Define to 1 if you have the `memset' function. */
-#undef HAVE_MEMSET
+#define HAVE_MEMSET 1
 
 /* Define to 1 if you have the `modf' function. */
-#undef HAVE_MODF
+#define HAVE_MODF 1
 
 /* Define to 1 if you have the <ncursesw/curses.h> header file. */
-#undef HAVE_NCURSESW_CURSES_H
+#define HAVE_NCURSESW_CURSES_H 1
 
 /* Define to 1 if you have the <ncursesw.h> header file. */
-#undef HAVE_NCURSESW_H
+/* #undef HAVE_NCURSESW_H */
 
 /* Define to 1 if you have the <ncurses/curses.h> header file. */
-#undef HAVE_NCURSES_CURSES_H
+/* #undef HAVE_NCURSES_CURSES_H */
 
 /* Define to 1 if you have the <ncurses.h> header file. */
-#undef HAVE_NCURSES_H
+/* #undef HAVE_NCURSES_H */
 
 /* Define to 1 if you have the <netdb.h> header file. */
-#undef HAVE_NETDB_H
+#define HAVE_NETDB_H 1
 
 /* Define to 1 if you have the <netinet/icmp6.h> header file. */
-#undef HAVE_NETINET_ICMP6_H
+#define HAVE_NETINET_ICMP6_H 1
 
 /* Define to 1 if you have the <netinet/in.h> header file. */
-#undef HAVE_NETINET_IN_H
+#define HAVE_NETINET_IN_H 1
 
 /* Define to 1 if you have the <netinet/in_systm.h> header file. */
-#undef HAVE_NETINET_IN_SYSTM_H
+#define HAVE_NETINET_IN_SYSTM_H 1
 
 /* Define to 1 if you have the <netinet/ip6.h> header file. */
-#undef HAVE_NETINET_IP6_H
+#define HAVE_NETINET_IP6_H 1
 
 /* Define to 1 if you have the <netinet/ip.h> header file. */
-#undef HAVE_NETINET_IP_H
+#define HAVE_NETINET_IP_H 1
 
 /* Define to 1 if you have the <netinet/ip_icmp.h> header file. */
-#undef HAVE_NETINET_IP_ICMP_H
+#define HAVE_NETINET_IP_ICMP_H 1
 
 /* Define to 1 if you have the <netinet/ip_var.h> header file. */
-#undef HAVE_NETINET_IP_VAR_H
+/* #undef HAVE_NETINET_IP_VAR_H */
 
 /* Define to 1 if you have the `select' function. */
-#undef HAVE_SELECT
+#define HAVE_SELECT 1
 
 /* Define to 1 if you have the <signal.h> header file. */
-#undef HAVE_SIGNAL_H
+#define HAVE_SIGNAL_H 1
 
 /* Define to 1 if you have the `socket' function. */
-#undef HAVE_SOCKET
+#define HAVE_SOCKET 1
 
 /* Define to 1 if you have the `sqrt' function. */
-#undef HAVE_SQRT
+/* #undef HAVE_SQRT */
 
 /* Define to 1 if you have the <stdint.h> header file. */
-#undef HAVE_STDINT_H
+#define HAVE_STDINT_H 1
 
 /* Define to 1 if you have the <stdlib.h> header file. */
-#undef HAVE_STDLIB_H
+#define HAVE_STDLIB_H 1
 
 /* Define to 1 if you have the `strcasecmp' function. */
-#undef HAVE_STRCASECMP
+#define HAVE_STRCASECMP 1
 
 /* Define to 1 if you have the `strdup' function. */
-#undef HAVE_STRDUP
+#define HAVE_STRDUP 1
 
 /* Define to 1 if you have the `strerror' function. */
-#undef HAVE_STRERROR
+#define HAVE_STRERROR 1
 
 /* Define to 1 if you have the `strerror_r' function. */
-#undef HAVE_STRERROR_R
+#define HAVE_STRERROR_R 1
 
 /* Define to 1 if you have the <strings.h> header file. */
-#undef HAVE_STRINGS_H
+#define HAVE_STRINGS_H 1
 
 /* Define to 1 if you have the <string.h> header file. */
-#undef HAVE_STRING_H
+#define HAVE_STRING_H 1
 
 /* Define to 1 if you have the `strncasecmp' function. */
-#undef HAVE_STRNCASECMP
+#define HAVE_STRNCASECMP 1
 
 /* Define to 1 if you have the `strtoul' function. */
-#undef HAVE_STRTOUL
+#define HAVE_STRTOUL 1
 
 /* Define to 1 if you have the <sys/socket.h> header file. */
-#undef HAVE_SYS_SOCKET_H
+#define HAVE_SYS_SOCKET_H 1
 
 /* Define to 1 if you have the <sys/stat.h> header file. */
-#undef HAVE_SYS_STAT_H
+#define HAVE_SYS_STAT_H 1
 
 /* Define to 1 if you have the <sys/time.h> header file. */
-#undef HAVE_SYS_TIME_H
+#define HAVE_SYS_TIME_H 1
 
 /* Define to 1 if you have the <sys/types.h> header file. */
-#undef HAVE_SYS_TYPES_H
+#define HAVE_SYS_TYPES_H 1
 
 /* Define to 1 if you have the <unistd.h> header file. */
-#undef HAVE_UNISTD_H
+#define HAVE_UNISTD_H 1
 
 /* Define to the sub-directory in which libtool stores uninstalled libraries.
    */
-#undef LT_OBJDIR
+#define LT_OBJDIR ".libs/"
 
 /* Name of package */
-#undef PACKAGE
+#define PACKAGE "liboping"
 
 /* Define to the address where bug reports for this package should be sent. */
-#undef PACKAGE_BUGREPORT
+#define PACKAGE_BUGREPORT "liboping@verplant.org"
 
 /* Define to the full name of this package. */
-#undef PACKAGE_NAME
+#define PACKAGE_NAME "liboping"
 
 /* Define to the full name and version of this package. */
-#undef PACKAGE_STRING
+#define PACKAGE_STRING "liboping 1.10.0"
 
 /* Define to the one symbol short name of this package. */
-#undef PACKAGE_TARNAME
+#define PACKAGE_TARNAME "liboping"
 
 /* Define to the home page for this package. */
-#undef PACKAGE_URL
+#define PACKAGE_URL "http://noping.cc/"
 
 /* Define to the version of this package. */
-#undef PACKAGE_VERSION
+#define PACKAGE_VERSION "1.10.0"
 
 /* Define to 1 if you have the ANSI C header files. */
-#undef STDC_HEADERS
+#define STDC_HEADERS 1
 
 /* Define to 1 if strerror_r returns char *. */
-#undef STRERROR_R_CHAR_P
+/* #undef STRERROR_R_CHAR_P */
 
 /* Define to 1 if you can safely include both <sys/time.h> and <time.h>. */
-#undef TIME_WITH_SYS_TIME
+#define TIME_WITH_SYS_TIME 1
 
 /* Version number of package */
-#undef VERSION
+#define VERSION "1.10.0"
 
 /* Define to 1 if you want to get debugging output. */
-#undef WITH_DEBUG
+/* #undef WITH_DEBUG */
 
 /* Define for Solaris 2.5.1 so the uint32_t typedef from <sys/synch.h>,
    <pthread.h>, or <semaphore.h> is not used. If the typedef were allowed, the
    #define below would cause a syntax error. */
-#undef _UINT32_T
+/* #undef _UINT32_T */
 
 /* Define for Solaris 2.5.1 so the uint8_t typedef from <sys/synch.h>,
    <pthread.h>, or <semaphore.h> is not used. If the typedef were allowed, the
    #define below would cause a syntax error. */
-#undef _UINT8_T
+/* #undef _UINT8_T */
 
 /* Define to `int' if <sys/types.h> doesn't define. */
-#undef gid_t
+/* #undef gid_t */
 
 /* Define to rpl_malloc if the replacement function should be used. */
-#undef malloc
+/* #undef malloc */
 
 /* Define to `unsigned int' if <sys/types.h> does not define. */
-#undef size_t
+/* #undef size_t */
 
 /* Define to `int' if <sys/types.h> does not define. */
-#undef ssize_t
+/* #undef ssize_t */
 
 /* Define to `int' if <sys/types.h> doesn't define. */
-#undef uid_t
+/* #undef uid_t */
 
 /* Define to the type of an unsigned integer type of width exactly 16 bits if
    such a type exists and the standard includes do not define it. */
-#undef uint16_t
+/* #undef uint16_t */
 
 /* Define to the type of an unsigned integer type of width exactly 32 bits if
    such a type exists and the standard includes do not define it. */
-#undef uint32_t
+/* #undef uint32_t */
 
 /* Define to the type of an unsigned integer type of width exactly 8 bits if
    such a type exists and the standard includes do not define it. */
-#undef uint8_t
+/* #undef uint8_t */

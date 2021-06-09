@@ -17,9 +17,7 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
  */
 
-#if HAVE_CONFIG_H
-# include <config.h>
-#endif
+#include "config.h"
 
 #if STDC_HEADERS
 # include <stdlib.h>
@@ -1101,7 +1099,7 @@ int main (int argc, char **argv) /* {{{ */
 			if ((host[0] == 0) || (host[0] == '#'))
 				continue;
 
-			if (ping_host_add(ping, host) < 0)
+			if (ping_host_add(ping, host, NULL, 0, NULL) < 0)
 			{
 				const char *errmsg = ping_get_error (ping);
 
@@ -1141,7 +1139,7 @@ int main (int argc, char **argv) /* {{{ */
 
 	for (i = optind; i < argc; i++)
 	{
-		if (ping_host_add (ping, argv[i]) < 0)
+		if (ping_host_add (ping, argv[i], NULL, 0, NULL) < 0)
 		{
 			const char *errmsg = ping_get_error (ping);
 
