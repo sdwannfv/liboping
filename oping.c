@@ -20,52 +20,52 @@
 #include "config.h"
 
 #if STDC_HEADERS
-# include <stdlib.h>
-# include <stdio.h>
-# include <string.h>
-# include <stdint.h>
-# include <inttypes.h>
-# include <errno.h>
-# include <assert.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdint.h>
+#include <inttypes.h>
+#include <errno.h>
+#include <assert.h>
 #else
-# error "You don't have the standard C99 header files installed"
+#error "You don't have the standard C99 header files installed"
 #endif /* STDC_HEADERS */
 
 #if HAVE_UNISTD_H
-# include <unistd.h>
+#include <unistd.h>
 #endif
 
 #if HAVE_MATH_H
-# include <math.h>
+#include <math.h>
 #endif
 
 #if TIME_WITH_SYS_TIME
-# include <sys/time.h>
-# include <time.h>
+#include <sys/time.h>
+#include <time.h>
 #else
-# if HAVE_SYS_TIME_H
-#  include <sys/time.h>
-# else
-#  include <time.h>
-# endif
+#if HAVE_SYS_TIME_H
+#include <sys/time.h>
+#else
+#include <time.h>
+#endif
 #endif
 
 #if HAVE_SYS_SOCKET_H
-# include <sys/socket.h>
+#include <sys/socket.h>
 #endif
 #if HAVE_NETINET_IN_H
-# include <netinet/in.h>
+#include <netinet/in.h>
 #endif
 #if HAVE_NETINET_IP_H
-# include <netinet/ip.h>
+#include <netinet/ip.h>
 #endif
 
 #if HAVE_NETDB_H
-# include <netdb.h> /* NI_MAXHOST */
+#include <netdb.h> /* NI_MAXHOST */
 #endif
 
 #if HAVE_SIGNAL_H
-# include <signal.h>
+#include <signal.h>
 #endif
 
 #if HAVE_SYS_TYPES_H
@@ -77,16 +77,16 @@
 #include "oping.h"
 
 #ifndef _POSIX_SAVED_IDS
-# define _POSIX_SAVED_IDS 0
+#define _POSIX_SAVED_IDS 0
 #endif
 
 #ifndef IPTOS_MINCOST
-# define IPTOS_MINCOST 0x02
+#define IPTOS_MINCOST 0x02
 #endif
 
 /* Remove GNU specific __attribute__ settings when using another compiler */
 #if !__GNUC__
-# define __attribute__(x) /**/
+#define __attribute__(x) /**/
 #endif
 
 typedef struct ping_context
@@ -830,7 +830,7 @@ static void update_host_hook (pingobj_iter_t *iter, /* {{{ */
 
     context = (ping_context_t *) ping_iterator_get_context (iter);
 
-# define HOST_PRINTF(...) printf(__VA_ARGS__)
+#define HOST_PRINTF(...) printf(__VA_ARGS__)
 
     update_context (context, latency);
 
@@ -1099,15 +1099,6 @@ int main (int argc, char **argv)
         {
             host_num++;
         }
-    }
-
-    /* Permanently drop root privileges if we're setuid-root. */
-    status = setuid (getuid ());
-    if (status != 0)
-    {
-        fprintf (stderr, "Dropping privileges failed: %s\n",
-                strerror (errno));
-        exit (EXIT_FAILURE);
     }
 
     if (host_num == 0)
