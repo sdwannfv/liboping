@@ -651,11 +651,47 @@ static ssize_t ping_sendto (pingobj_t *obj, pinghost_t *ph,
         const void *buf, size_t buflen, int fd)
 {
     ssize_t ret;
+    int srcbind = 0, devicebind = 0;
+
+    if (ph->srcaddrlen)
+    {
+        ret = bind (fd, &ph->srcaddr, ph->srcaddrlen);
+        if (ret != 0)
+        {
+            ping_set_errno (obj, errno);
+#if WITH_DEBUG
+            char errbuf[PING_ERRMSG_LEN];
+            dprintf ("bind: %s\n",
+                    sstrerror (errno, errbuf, sizeof (errbuf)));
+#endif
+            goto exit;
+        }
+        srcbind = 1;
+    }
+
+    if (strlen(ph->device))
+    {
+        ret = setsockopt (fd, SOL_SOCKET, SO_BINDTODEVICE,
+                            ph->device, strlen (ph->device) + 1);
+        if (ret != 0)
+        {
+            ping_set_errno (obj, errno);
+#if WITH_DEBUG
+            char errbuf[PING_ERRMSG_LEN];
+            dprintf ("setsockopt (SO_BINDTODEVICE): %s\n",
+                    sstrerror (errno, errbuf, sizeof (errbuf)));
+#endif
+            goto exit;
+        }
+        devicebind = 1;
+    }
 
     if (gettimeofday (ph->timer, NULL) == -1)
     {
+        ping_set_errno (obj, errno);
         timerclear (ph->timer);
-        return (-1);
+        ret = -1;
+        goto exit;
     }
 
     ret = sendto (fd, buf, buflen, 0,
@@ -674,6 +710,73 @@ static ssize_t ping_sendto (pingobj_t *obj, pinghost_t *ph,
         ping_set_errno (obj, errno);
     }
 
+exit:
+    if (srcbind)
+    {
+        if (obj->srcaddr != NULL)
+        {
+            assert (obj->srcaddrlen > 0);
+            assert (obj->srcaddrlen <= sizeof (struct sockaddr_storage));
+    
+            if (bind (fd, obj->srcaddr, obj->srcaddrlen) == -1)
+            {
+                ping_set_errno (obj, errno);
+#if WITH_DEBUG
+                char errbuf[PING_ERRMSG_LEN];
+                dprintf ("bind: %s\n",
+                        sstrerror (errno, errbuf, sizeof (errbuf)));
+#endif
+            }
+        }
+        else
+        {
+            if (fd == obj->fd4_send)
+            {
+                struct sockaddr_in addr4;
+                memset(&addr4, 0, sizeof(addr4));
+                addr4.sin_family = AF_INET;
+                if (bind (fd, (struct sockaddr *)&addr4, sizeof(addr4)) == -1)
+                {
+                    char errbuf[PING_ERRMSG_LEN];
+                    dprintf ("bind: %s\n",
+                             sstrerror (errno, errbuf, sizeof (errbuf)));
+                }
+            }
+            else
+            {
+                struct sockaddr_in6 addr6;
+                memset(&addr6, 0, sizeof(addr6));
+                addr6.sin6_family = AF_INET6;
+                if (bind (fd, (struct sockaddr *)&addr6, sizeof(addr6)) == -1)
+                {
+                    char errbuf[PING_ERRMSG_LEN];
+                    dprintf ("bind: %s\n",
+                             sstrerror (errno, errbuf, sizeof (errbuf)));
+                }
+            }
+            ping_set_errno (obj, errno);
+#if WITH_DEBUG
+            char errbuf[PING_ERRMSG_LEN];
+            dprintf ("bind: %s\n",
+                    sstrerror (errno, errbuf, sizeof (errbuf)));
+#endif
+        }
+    }
+    if (devicebind)
+    {
+        if (setsockopt (fd, SOL_SOCKET, SO_BINDTODEVICE,
+                obj->device,
+                obj->device ? (strlen (obj->device) + 1) : 0) != 0)
+        {
+            ping_set_errno (obj, errno);
+#if WITH_DEBUG
+            char errbuf[PING_ERRMSG_LEN];
+            dprintf ("setsockopt (SO_BINDTODEVICE): %s\n",
+                    sstrerror (errno, errbuf, sizeof (errbuf)));
+#endif
+        }
+    }
+    
     return (ret);
 }
 
@@ -1962,6 +2065,17 @@ int ping_iterator_get_info (pingobj_iter_t *iter, int info,
             if (orig_buffer_len < *buffer_len)
                 break;
             memcpy(buffer,&iter->recv_qos,*buffer_len);
+            ret = 0;
+            break;
+        case PING_INFO_DEVICE:
+            ret = ENOMEM;
+            *buffer_len = strlen (iter->device) + 1;
+            if (orig_buffer_len < *buffer_len)
+                break;
+            /* Since (orig_buffer_len > *buffer_len) `strncpy'
+             * will copy `*buffer_len' and pad the rest of
+             * `buffer' with null-bytes */
+            strncpy (buffer, iter->device, orig_buffer_len);
             ret = 0;
             break;
     }

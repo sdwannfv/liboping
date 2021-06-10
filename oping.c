@@ -59,6 +59,7 @@
 #if HAVE_NETINET_IP_H
 #include <netinet/ip.h>
 #endif
+#include <arpa/inet.h>
 
 #if HAVE_NETDB_H
 #include <netdb.h> /* NI_MAXHOST */
@@ -93,7 +94,8 @@ typedef struct ping_context
 {
     char host[NI_MAXHOST];
     char addr[NI_MAXHOST];
-
+    char device[IFNAMSIZ];
+ 
     int index;
     int req_sent;
     int req_rcvd;
@@ -301,6 +303,9 @@ static int ping_initialize_contexts (pingobj_t *ping)
 
         buffer_size = sizeof (context->addr);
         ping_iterator_get_info (iter, PING_INFO_ADDRESS, context->addr, &buffer_size);
+
+        buffer_size = sizeof (context->device);
+        ping_iterator_get_info (iter, PING_INFO_DEVICE, context->device, &buffer_size);
 
         ping_iterator_set_context (iter, (void *) context);
 
@@ -748,8 +753,8 @@ static int pre_loop_hook (pingobj_t *ping) /* {{{ */
         buffer_size = 0;
         ping_iterator_get_info (iter, PING_INFO_DATA, NULL, &buffer_size);
 
-        printf ("PING %s (%s) %zu bytes of data.\n",
-                ctx->host, ctx->addr, buffer_size);
+        printf ("PING %s (%s) %zu bytes of data. dev %s\n",
+                ctx->host, ctx->addr, buffer_size, ctx->device);
     }
 
     return (0);
@@ -941,6 +946,10 @@ int main (int argc, char **argv)
     struct timeval  tv_end;
     struct timespec ts_wait;
     struct timespec ts_int;
+    struct sockaddr_in addr4;
+    struct sockaddr_in6 addr6;
+    struct sockaddr *addr;
+    socklen_t addr_len;
 
     int optind;
     int i;
@@ -948,19 +957,6 @@ int main (int argc, char **argv)
 
     setlocale(LC_ALL, "");
     optind = read_options (argc, argv);
-
-    /* Cannot temporarily drop privileges -> reject every file but "-". */
-    if ((opt_filename != NULL)
-            && (strcmp ("-", opt_filename) != 0)
-            && (getuid () != geteuid ()))
-    {
-        fprintf (stderr, "Your real and effective user IDs don't "
-                "match. Reading from a file (option '-f')\n"
-                "is therefore too risky. You can still read "
-                "from STDIN using '-f -' if you like.\n"
-                "Sorry.\n");
-        exit (EXIT_FAILURE);
-    }
 
     if ((optind >= argc) && (opt_filename == NULL)) {
         usage_exit (argv[0], 1);
@@ -1045,6 +1041,8 @@ int main (int argc, char **argv)
         FILE *infile;
         char line[256];
         char host[256];
+        char srcaddr[256];
+        char device[256];
 
         if (strcmp (opt_filename, "-") == 0)
             /* Open STDIN */
@@ -1063,14 +1061,46 @@ int main (int argc, char **argv)
 
         while (fgets(line, sizeof(line), infile))
         {
+            memset(host, 0, sizeof(host));
+            memset(srcaddr, 0, sizeof(srcaddr));
+            memset(device, 0, sizeof(device));
+            memset(&addr4, 0, sizeof(addr4));
+            memset(&addr6, 0, sizeof(addr6));
+            addr4.sin_family = AF_INET;
+            addr6.sin6_family = AF_INET6;
+
             /* Strip whitespace */
-            if (sscanf(line, "%s", host) != 1)
+            if (sscanf(line, "%s %s %s", host, srcaddr, device) < 1)
                 continue;
 
             if ((host[0] == 0) || (host[0] == '#'))
                 continue;
 
-            if (ping_host_add(ping, host, NULL, 0, NULL) < 0)
+            if (srcaddr[0] == 0)
+            {
+                addr = NULL;
+                addr_len = 0;
+            }
+            else
+            {
+                if (inet_pton(AF_INET, srcaddr, &addr4.sin_addr))
+                {
+                    addr = (struct sockaddr *)&addr4;
+                }
+                else if(inet_pton(AF_INET6, srcaddr, &addr6.sin6_addr))
+                {
+                    addr = (struct sockaddr *)&addr6;
+                }
+                else
+                {
+                    continue;
+                }
+            }
+
+            if (strlen(device) && strlen(device) >= IFNAMSIZ)
+                continue;
+
+            if (ping_host_add(ping, host, addr, sizeof(*addr), device) < 0)
             {
                 const char *errmsg = ping_get_error (ping);
 

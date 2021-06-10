@@ -90,6 +90,8 @@ int ping_iterator_count (pingobj_t *obj);
 #define PING_INFO_DROPPED   9
 #define PING_INFO_RECV_TTL 10
 #define PING_INFO_RECV_QOS 11
+#define PING_INFO_DEVICE   12
+
 int ping_iterator_get_info (pingobj_iter_t *iter, int info,
 		void *buffer, size_t *buffer_len);
 
