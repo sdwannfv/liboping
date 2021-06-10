@@ -1243,6 +1243,7 @@ int main (int argc, char **argv)
             index++;
         }
 
+        struct timeval tv_out_bak = tv_out;;
         while (opt_count == 1 && timeval_cmp(&tv_out, &tv_interval) > 0)
         {
             timeradd(&tv_end, &tv_interval, &tv_end);
@@ -1258,7 +1259,7 @@ int main (int argc, char **argv)
                     iter != NULL;
                     iter = ping_iterator_next (iter))
             {
-                while (update_host_hook (iter, index, &tv_end, &tv_out));
+                while (update_host_hook (iter, index, &tv_end, &tv_out_bak));
                 index++;
             }
             timersub(&tv_out, &tv_interval, &tv_out);
