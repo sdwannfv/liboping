@@ -128,7 +128,7 @@ typedef struct ping_context
     _Bool history_dirty;
 } ping_context_t;
 
-static double  opt_interval   = 1.0;
+static double  opt_interval   = PING_DEF_TIMEOUT;
 static double  opt_timeout    = PING_DEF_TIMEOUT;
 static int     opt_addrfamily = PING_DEF_AF;
 static char   *opt_srcaddr    = NULL;
@@ -735,6 +735,19 @@ static void time_calc (struct timespec *ts_dest,
     time_normalize (ts_dest);
 }
 
+int timeval_cmp(struct timeval *tv1, struct timeval *tv2)
+{
+    if (tv1->tv_sec > tv2->tv_sec)
+        return 1;
+    if (tv1->tv_sec < tv2->tv_sec)
+        return -1;
+    if (tv1->tv_usec > tv2->tv_usec)
+        return 1;
+    if (tv1->tv_usec < tv2->tv_usec)
+        return -1;
+    return 0;
+}
+
 static int pre_loop_hook (pingobj_t *ping) /* {{{ */
 {
     pingobj_iter_t *iter;
@@ -797,17 +810,36 @@ static void update_context (ping_context_t *ctx, double latency) /* {{{ */
         ctx->history_size++;
 }
 
-static void update_host_hook (pingobj_iter_t *iter, /* {{{ */
-        __attribute__((unused)) int index)
+static int update_host_hook (pingobj_iter_t *iter, /* {{{ */
+        __attribute__((unused)) int index, struct timeval *tv_now,
+        struct timeval *tv_out)
 {
     double          latency;
     unsigned int    sequence;
     int             recv_ttl;
     uint8_t         recv_qos;
     char            recv_qos_str[16];
+    struct timeval  tv_send;
+    struct timeval  tv_end;
     size_t          buffer_len;
     size_t          data_len;
     ping_context_t *context;
+
+
+    timerclear(&tv_send);
+    buffer_len = sizeof(struct timeval);
+    ping_iterator_get_info (iter, PING_INFO_TIME,
+             &tv_send, &buffer_len);
+    if (!timerisset(&tv_send))
+    {
+        return 0;
+    }
+    timeradd(&tv_send, tv_out, &tv_end);
+    if (tv_end.tv_sec > tv_now->tv_sec || 
+        (tv_end.tv_sec == tv_now->tv_sec && tv_end.tv_usec > tv_now->tv_usec))
+    {
+        return 0;
+    }
 
     latency = -1.0;
     buffer_len = sizeof (latency);
@@ -877,6 +909,9 @@ static void update_host_hook (pingobj_iter_t *iter, /* {{{ */
         }
     }
 
+    ping_iterator_inc_index(iter);
+
+    return 1;
 }
 
 /* Prints statistics for each host, cleans up the contexts and returns the
@@ -939,18 +974,15 @@ int main (int argc, char **argv)
 {
     pingobj_t      *ping;
     pingobj_iter_t *iter;
-
     struct sigaction sigint_action;
-
     struct timeval  tv_begin;
     struct timeval  tv_end;
-    struct timespec ts_wait;
-    struct timespec ts_int;
+    struct timeval  tv_interval;
+    struct timeval  tv_out;
     struct sockaddr_in addr4;
     struct sockaddr_in6 addr6;
     struct sockaddr *addr;
     socklen_t addr_len;
-
     int optind;
     int i;
     int status;
@@ -982,16 +1014,22 @@ int main (int argc, char **argv)
 
     {
         double temp_sec;
-        double temp_nsec;
+        double temp_usec;
 
-        temp_nsec = modf (opt_interval, &temp_sec);
-        ts_int.tv_sec  = (time_t) temp_sec;
-        ts_int.tv_nsec = (long) (temp_nsec * 1000000000L);
+        temp_usec = modf (opt_interval, &temp_sec);
+        tv_interval.tv_sec  = (time_t) temp_sec;
+        tv_interval.tv_usec = (long) (temp_usec * 1000000L);
 
         /* printf ("ts_int = %i.%09li\n", (int) ts_int.tv_sec, ts_int.tv_nsec); */
     }
 
     if (ping_setopt (ping, PING_OPT_TIMEOUT, (void*)(&opt_timeout)) != 0)
+    {
+        fprintf (stderr, "Setting timeout failed: %s\n",
+                ping_get_error (ping));
+    }
+
+    if (ping_setopt (ping, PING_OPT_INTERVAL, (void*)(&opt_interval)) != 0)
     {
         fprintf (stderr, "Setting timeout failed: %s\n",
                 ping_get_error (ping));
@@ -1158,6 +1196,10 @@ int main (int argc, char **argv)
         return (1);
     }
 
+    /* Set up timeout */
+    tv_out.tv_sec = (time_t) opt_timeout;
+    tv_out.tv_usec = (suseconds_t) (1000000 * (opt_timeout - ((double) tv_out.tv_sec)));
+
     pre_loop_hook (ping);
 
     while (opt_count != 0)
@@ -1183,20 +1225,8 @@ int main (int argc, char **argv)
             return (1);
         }
 
-        index = 0;
-        for (iter = ping_iterator_get (ping);
-                iter != NULL;
-                iter = ping_iterator_next (iter))
-        {
-            update_host_hook (iter, index);
-            index++;
-        }
-
-        pre_sleep_hook (ping);
-
-        /* Don't sleep in the last iteration */
-        if (opt_count == 1)
-            break;
+        timeradd(&tv_begin, &tv_interval, &tv_end);
+        ping_recv(ping, &tv_end);
 
         if (gettimeofday (&tv_end, NULL) < 0)
         {
@@ -1204,21 +1234,37 @@ int main (int argc, char **argv)
             return (1);
         }
 
-        time_calc (&ts_wait, &ts_int, &tv_begin, &tv_end);
-
-        /* printf ("Sleeping for %i.%09li seconds\n", (int) ts_wait.tv_sec, ts_wait.tv_nsec); */
-        while ((status = nanosleep (&ts_wait, &ts_wait)) != 0)
+        index = 0;
+        for (iter = ping_iterator_get (ping);
+                iter != NULL;
+                iter = ping_iterator_next (iter))
         {
-            if (errno == EINTR)
-            {
-                continue;
-            }
-            else
-            {
-                perror ("nanosleep");
-                break;
-            }
+            while (update_host_hook (iter, index, &tv_end, &tv_out));
+            index++;
         }
+
+        while (opt_count == 1 && timeval_cmp(&tv_out, &tv_interval) > 0)
+        {
+            timeradd(&tv_end, &tv_interval, &tv_end);
+            ping_recv(ping, &tv_end);
+            if (gettimeofday (&tv_end, NULL) < 0)
+            {
+                perror ("gettimeofday");
+                return (1);
+            }
+
+            index = 0;
+            for (iter = ping_iterator_get (ping);
+                    iter != NULL;
+                    iter = ping_iterator_next (iter))
+            {
+                while (update_host_hook (iter, index, &tv_end, &tv_out));
+                index++;
+            }
+            timersub(&tv_out, &tv_interval, &tv_out);
+        }
+
+        pre_sleep_hook (ping);
 
         post_sleep_hook (ping);
 

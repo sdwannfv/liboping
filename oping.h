@@ -55,6 +55,7 @@ typedef struct pingobj pingobj_t;
 #define PING_OPT_DEVICE  0x20
 #define PING_OPT_QOS     0x40
 #define PING_OPT_MARK    0x80
+#define PING_OPT_INTERVAL 0x100
 
 #define PING_DEF_TIMEOUT 1.0
 #define PING_DEF_TTL     255
@@ -70,6 +71,8 @@ void ping_destroy (pingobj_t *obj);
 int ping_setopt (pingobj_t *obj, int option, void *value);
 
 int ping_send (pingobj_t *obj);
+
+int ping_recv (pingobj_t *obj, struct timeval *endtime);
 
 int ping_host_add (pingobj_t *obj, const char *host, struct sockaddr *srcaddr,
 		socklen_t srcaddrlen, char *device);
@@ -91,12 +94,15 @@ int ping_iterator_count (pingobj_t *obj);
 #define PING_INFO_RECV_TTL 10
 #define PING_INFO_RECV_QOS 11
 #define PING_INFO_DEVICE   12
+#define PING_INFO_TIME     13
+
 
 int ping_iterator_get_info (pingobj_iter_t *iter, int info,
 		void *buffer, size_t *buffer_len);
 
 const char *ping_get_error (pingobj_t *obj);
 
+void ping_iterator_inc_index (pingobj_iter_t *iter);
 void *ping_iterator_get_context (pingobj_iter_t *iter);
 void  ping_iterator_set_context (pingobj_iter_t *iter, void *context);
 
