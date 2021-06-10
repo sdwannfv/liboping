@@ -332,7 +332,7 @@ static pinghost_t *ping_receive_ipv4 (pingobj_t *obj, char *buffer,
             continue;
 
         int index;
-        int recv_index = ptr->recv_pkt_index;
+        int recv_index = ptr->update_pkt_index;
         int send_index = ptr->send_pkt_index;
 
         if (recv_index > send_index)
@@ -340,7 +340,7 @@ static pinghost_t *ping_receive_ipv4 (pingobj_t *obj, char *buffer,
 
         for (index = recv_index; index < send_index; index ++)
         {
-            if (!timerisset (ptr->timer + ptr->recv_pkt_index))
+            if (!timerisset (ptr->timer + (index % MAX_PACKETS_IN_FLIGHT)))
                 continue;
 
             if (((ptr->sequence - (send_index - index)) & 0xFFFF) == seq)
@@ -427,7 +427,7 @@ static pinghost_t *ping_receive_ipv6 (pingobj_t *obj, char *buffer,
             continue;
 
         int index;
-        int recv_index = ptr->recv_pkt_index;
+        int recv_index = ptr->update_pkt_index;
         int send_index = ptr->send_pkt_index;
 
         if (recv_index > send_index)
@@ -435,7 +435,7 @@ static pinghost_t *ping_receive_ipv6 (pingobj_t *obj, char *buffer,
 
         for (index = recv_index; index < send_index; index ++)
         {
-            if (!timerisset (ptr->timer + ptr->recv_pkt_index))
+            if (!timerisset (ptr->timer + (index % MAX_PACKETS_IN_FLIGHT)))
                 continue;
 
             if (((ptr->sequence - (send_index - index)) & 0xFFFF) == seq)
@@ -643,8 +643,6 @@ static int ping_receive_one (pingobj_t *obj, struct timeval *now, int addrfam)
     if (host->latency[host->recv_pkt_index] / 1000  > obj->timeout)
         host->latency[host->recv_pkt_index] = -1;
 //    timerclear (host->timer + host->recv_pkt_index);
-    host->recv_pkt_index ++;
-    host->recv_pkt_index = host->recv_pkt_index % MAX_PACKETS_IN_FLIGHT;
 
     return (0);
 }
