@@ -118,7 +118,7 @@ struct pinghost
     socklen_t                srcaddrlen;
     char                     device[IFNAMSIZ];
     int                      ident;
-    int                      sequence;
+    unsigned long            sequence;
     struct timeval           timer[MAX_PACKETS_IN_FLIGHT];
     int                      send_pkt_index;
     int                      recv_pkt_index;
@@ -325,9 +325,6 @@ static pinghost_t *ping_receive_ipv4 (pingobj_t *obj, char *buffer,
     for (ptr = obj->table[ident % PING_TABLE_LEN];
             ptr != NULL; ptr = ptr->table_next)
     {
-        dprintf ("hostname = %s, ident = 0x%04x, seq = %i\n",
-                ptr->hostname, ptr->ident, ((ptr->sequence - 1) & 0xFFFF));
-
         if (ptr->addrfamily != AF_INET)
             continue;
 
@@ -423,9 +420,6 @@ static pinghost_t *ping_receive_ipv6 (pingobj_t *obj, char *buffer,
      * be received on any raw v6 socket. */
     for (ptr = obj->head; ptr != NULL; ptr = ptr->next)
     {
-        dprintf ("hostname = %s, ident = 0x%04x, seq = %i\n",
-                ptr->hostname, ptr->ident, ((ptr->sequence - 1) & 0xFFFF));
-
         if (ptr->addrfamily != AF_INET6)
             continue;
 
@@ -650,6 +644,7 @@ static int ping_receive_one (pingobj_t *obj, struct timeval *now, int addrfam)
         host->latency[host->recv_pkt_index] = -1;
 //    timerclear (host->timer + host->recv_pkt_index);
     host->recv_pkt_index ++;
+    host->recv_pkt_index = host->recv_pkt_index % MAX_PACKETS_IN_FLIGHT;
 
     return (0);
 }
@@ -810,7 +805,7 @@ static int ping_send_one_ipv4 (pingobj_t *obj, pinghost_t *ph, int fd)
     *icmp4 = (struct icmp) {
         .icmp_type = ICMP_ECHO,
         .icmp_id   = htons (ph->ident),
-        .icmp_seq  = htons (ph->sequence),
+        .icmp_seq  = htons ((unsigned short)ph->sequence),
     };
 
     datalen = strlen (ph->data);
@@ -854,7 +849,7 @@ static int ping_send_one_ipv6 (pingobj_t *obj, pinghost_t *ph, int fd)
     *icmp6 = (struct icmp6_hdr) {
         .icmp6_type  = ICMP6_ECHO_REQUEST,
         .icmp6_id    = htons (ph->ident),
-        .icmp6_seq   = htons (ph->sequence),
+        .icmp6_seq   = htons ((unsigned short)ph->sequence),
     };
 
     datalen = strlen (ph->data);
@@ -908,9 +903,9 @@ static int ping_send_one (pingobj_t *obj, pinghost_t *ptr, int fd)
         return (-1);
     }
 
-    ptr->sequence++;
-    ptr->send_pkt_index++;
-
+    ptr->sequence ++;
+    ptr->send_pkt_index ++;
+    ptr->send_pkt_index = ptr->send_pkt_index % MAX_PACKETS_IN_FLIGHT;
     return (0);
 }
 
@@ -2130,17 +2125,17 @@ int ping_iterator_get_info (pingobj_iter_t *iter, int info,
 
         case PING_INFO_SEQUENCE:
             ret = ENOMEM;
-            *buffer_len = sizeof (unsigned int);
-            if (orig_buffer_len < sizeof (unsigned int))
+            *buffer_len = sizeof (unsigned long);
+            if (orig_buffer_len < sizeof (unsigned long))
                 break;
-            unsigned int sequence = (unsigned int) iter->sequence;
+            unsigned long sequence = (unsigned int) iter->sequence;
             if (iter->update_pkt_index < iter->send_pkt_index)
                 sequence = sequence - (iter->send_pkt_index - iter->update_pkt_index);
             else
-                sequence = sequence - (iter->update_pkt_index +MAX_PACKETS_IN_FLIGHT
+                sequence = sequence - (iter->update_pkt_index + MAX_PACKETS_IN_FLIGHT
                             - iter->send_pkt_index);
             sequence = sequence & 0xffff;
-            *((unsigned int *) buffer) = sequence;
+            *((unsigned long *) buffer) = sequence;
             ret = 0;
             break;
 

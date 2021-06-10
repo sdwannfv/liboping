@@ -815,7 +815,7 @@ static int update_host_hook (pingobj_iter_t *iter, /* {{{ */
         struct timeval *tv_out)
 {
     double          latency;
-    unsigned int    sequence;
+    unsigned long   sequence;
     int             recv_ttl;
     uint8_t         recv_qos;
     char            recv_qos_str[16];
@@ -873,7 +873,7 @@ static int update_host_hook (pingobj_iter_t *iter, /* {{{ */
 
     if (latency > 0.0)
     {
-        HOST_PRINTF ("%zu bytes from %s (%s): icmp_seq=%u ttl=%i ",
+        HOST_PRINTF ("%zu bytes from %s (%s): icmp_seq=%lu ttl=%i ",
                 data_len,
                 context->host, context->addr,
                 sequence, recv_ttl);
@@ -890,7 +890,7 @@ static int update_host_hook (pingobj_iter_t *iter, /* {{{ */
     }
     else /* if (!(latency > 0.0)) */
     {
-        HOST_PRINTF ("echo reply from %s (%s): icmp_seq=%u timeout\n",
+        HOST_PRINTF ("echo reply from %s (%s): icmp_seq=%lu timeout\n",
                 context->host, context->addr,
                 sequence);
     }
