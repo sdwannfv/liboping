@@ -1861,7 +1861,6 @@ int ping_host_add (pingobj_t *obj, const char *host, struct sockaddr *srcaddr, s
         {
             ai_ptr->ai_socktype = SOCK_RAW;
             ai_ptr->ai_protocol = IPPROTO_ICMPV6;
-            continue;
         }
         else
         {
